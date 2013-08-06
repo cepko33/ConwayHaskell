@@ -1,4 +1,7 @@
-import Graphics.HGL
+import FRP.Helm
+import qualified FRP.Helm.Mouse as Mouse
+import qualified FRP.Helm.Time as Time
+import qualified FRP.Helm.Window as Window
 
 updateLive x y grid
 	| neigh < 2 = 0
@@ -18,19 +21,10 @@ gp x y grid
 numNeigh :: Integer -> Integer -> [[Integer]] -> Integer
 numNeigh x y grid = sum [gp (x+n) (y+m) grid | n<-[-1..1], m<-[-1..1], not $ (n == 0 && m == 0)]
 
-testGrid = [[0,0,0,1,0],[0,1,0,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,0,0,0]]
+beacon = [[0,0,1,1,0],[0,0,0,1,0],[1,0,0,0,0],[1,1,0,0,0],[0,0,0,0,0]]
+toad = [[0,1,0,0,0],[0,1,1,0,0],[0,1,1,0,0],[0,0,1,0,0],[0,0,0,0,0]]
+genGrid x = [[0 | n<-[1..x]] | m<-[1..x]]
 
--- 00000
--- 10000
--- 00110
--- 01000
--- 00000
---becomes
--- 00000
--- 00000
--- 01100
--- 00100
--- 00000
 
 updateGridCol x y grid
 	| y == (fromIntegral . length) grid = []
@@ -41,10 +35,24 @@ updateGrid x grid
 	| x == (fromIntegral . length) grid = []
 	| otherwise = updateGridCol x 0 grid:updateGrid (x+1) grid
 
+genRender siz grid = genRenderW 0 siz grid
+
+genRenderW _ _ [] = []
+genRenderW x siz grid = genRender' x 0 siz (head grid) ++ genRenderW (x+1) siz (tail grid)
+
+genRender' _ _ _ [] = []
+genRender' x y siz (0:rest) = genRender' x (y+1) siz rest
+genRender' x y siz (1:rest) = (move (siz*x + siz/2, siz*y + siz/2) $ filled red $ rect siz siz):genRender' x (y+1) siz rest
+
+step :: Time -> [[Integer]] -> [[Integer]]
+step dt True grid = updateGrid 0 grid
+
+fi = fromIntegral
+
+render :: [[Integer]] -> (Int,Int) -> Element
+render grid (w,h) = collage w h (genRender 20 grid)
 
 main :: IO ()
-main = runGraphics $
-	withWindow_ "Hello World Window" (300, 200) $ \ w -> do
-	drawInWindow w $ text (100, 100) "Hello World"
-	drawInWindow w $ ellipse (100, 80) (200, 180)
-	getKey w
+main = run defaultConfig $ render <~ foldp step toad ( (Time.delay $ Time.fps 2)  ~~ Window.dimensions 
+
+
